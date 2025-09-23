@@ -26,20 +26,20 @@ The project will also produce:
 ---
 
 ## 🔹 Repository structure
-VaR-Portfolio/
-│
-├── code/ → Python scripts and notebooks
-├── data/ → datasets (or links to data sources)
-├── plots/ → saved plots
-└── README.md → this file
+- `code/` → Python scripts and notebooks  
+- `data/` → datasets (or links to sources)  
+- `plots/` → generated figures  
+- `README.md` → project description  
 
 ---
 
-## 🔹 Next steps
-- [ ] Implement Parametric VaR  
+## 🛠 Roadmap
+- [ ] Create repository and setup README  
+- [ ] Implement Parametric VaR (Variance-Covariance method)  
+- [ ] Add visualization of returns distribution with VaR line  
 - [ ] Implement Historical Simulation  
 - [ ] Implement Monte Carlo Simulation  
-- [ ] Compare results  
+- [ ] Compare results and summarize findings  
 
 ---
 
