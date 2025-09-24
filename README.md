@@ -163,7 +163,7 @@ Re-run and enter just the ISO-3 code (e.g., EUR) at that prompt.
 
 Data source: Yahoo Finance, auto-adjusted prices (splits/dividends).
 
-VaR is a statistical estimate; extreme losses can exceed VaR. Educational use only.
+VaR is a statistical estimate; extreme losses can exceed VaR.
 
 Crypto are 24/7; downsampled to business days by default for comparability.
 
