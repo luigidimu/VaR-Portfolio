@@ -1,9 +1,13 @@
 # 📊 Value-at-Risk (VaR) — Multi-Asset, Interactive
 
 Interactive Python tool to compute 1-day VaR for multi-asset portfolios (equities, ETFs, commodity futures, FX, crypto) using Yahoo Finance data.
+
 All series are converted to a base currency you choose (default EUR), then four VaR methods are compared on two horizons (2024→today and 2015→today).
 
 ---
+
+![Parametric VaR example](plots/parametric_2024_2025_interactive.png)
+
 
 ## ✅ What the code does
 
