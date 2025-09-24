@@ -1,176 +1,117 @@
-Value-at-Risk (VaR) Portfolio – Multi-Asset & Interactive
+# 📊 Value-at-Risk (VaR) — Multi-Asset, Interactive
 
-Progetto per calcolare e confrontare il VaR giornaliero di un portafoglio multi-asset usando 4 metodi:
+Interactive Python tool to compute 1-day VaR for multi-asset portfolios (equities, ETFs, commodity futures, FX, crypto) using Yahoo Finance data.
+All series are converted to a base currency you choose (default EUR), then four VaR methods are compared on two horizons (2024→today and 2015→today).
 
-Parametric (Normal)
+---
 
-Historical Simulation
+## ✅ What the code does
 
-Monte Carlo – Normal multivariata
+- Downloads prices for user-provided tickers.
+- Converts every series to the chosen base currency via Yahoo FX.
+- Aligns data to a common calendar (Business Days by default).
+- Computes portfolio log-returns from user amounts/weights.
+- Calculates VaR 95% & 99% with four methods:
+  - Parametric (Normal)
+  - Historical Simulation
+  - Monte Carlo (Normal multivariate)
+  - Monte Carlo (t-Student multivariate) with df estimated from excess kurtosis
+- Produces charts with VaR lines, CSV summary, and plain-language messages.
+---
+## 🛠️ How it was built (step-by-step)
 
-Monte Carlo – t-Student multivariata (code pesanti, df stimato dalla kurtosi)
+Input (CLI, interactive).
+1. Ask user for: tickers, base currency (ISO-3), amounts in base currency.
+2. Download prices.
+   1. yfinance.download(..., auto_adjust=True) to get close prices (dividends/splits adjusted).
+   2. Detect quote currency.
+   3. For each ticker, read fast_info["currency"].
+   4. FX conversion to base.
+   5. If quote currency ≠ base, download the FX pair (BASEQUOTE=X) and convert price: -> price_in_base = price_in_quote / FX(BASE/QUOTE).
+3. Calendar alignment.
+4. Reindex to Business Days (“B”) and forward-fill gaps (crypto are 24/7, others aren’t).
+5. Portfolio returns.
+6. Log-returns per asset → weight by user amounts → single portfolio return series.
+7. VaR engines.
+   1. Parametric: VaRα = −(μ + zα·σ)·Capital
+   2. Historical: empirical α-quantile of returns (left tail)
+   3. MC Normal: draw from N(μ, Σ) preserving historical covariance
+   4. MC t-Student: scale-mixture t_df(μ, Σ); df estimated from portfolio excess kurtosis
+8. Outputs.
+Save VaR table (CSV), render 8 charts (method × horizon), print human-readable messages.
+---
+## 📚 Libraries used (and why)
 
-Supporta azioni, ETF, futures su materie prime, FX e crypto.
-Tutti i prezzi vengono convertiti automaticamente nella valuta base scelta (default: EUR).
-Analisi su due orizzonti: 2024→oggi e 2015→oggi.
+- yfinance – free Yahoo Finance access (prices & FX).
+- pandas – time-series handling, joins, resampling, CSV export.
+- numpy – vector math, random draws, percentiles.
+- scipy.stats – Normal PDF/quantiles; chi-square for t-mixture.
+- matplotlib – histograms + VaR lines for visual inspection.
 
-Contenuti del repository
-var-portfolio/
-├─ code/
-│  └─ var_interactive_multiasset.py   # script interattivo (multi-asset + FX + crypto)
-├─ plots/                             # grafici generati (PNG)
-├─ outputs/
-│  └─ var_comparison_interactive_multiasset.csv
-└─ README.md
-
-Requisiti
+---
+## 🚀 Quick start
 
 Python 3.9+
 
-Librerie: numpy, pandas, matplotlib, scipy, yfinance
-
-Installazione rapida:
-
-# opzionale: ambiente
-# conda create -n var python=3.10 -y && conda activate var
-
 pip install numpy pandas matplotlib scipy yfinance
-
-Avvio rapido (script interattivo)
-
-Esegui:
-
 python code/var_interactive_multiasset.py
 
+You will be prompted for:
 
-Lo script chiede:
+Tickers (comma-separated):
+- e.g., NVDA,AAPL,TLT,GLD,BTC-USD,EURUSD=X
+- Base currency (ISO-3): EUR (default), USD, GBP, …
+- Amounts in base currency (same order as tickers): e.g., 2000,1500,1000,500,300,200
+---
+## 📤 Outputs
 
-Tickers (separati da virgola)
+CSV summary → outputs/var_comparison_interactive_multiasset.csv
 
-Azioni/ETF: NVDA,AAPL,TLT,GLD
+(VaR 95/99 by method & horizon on your total capital)
 
-Futures (continuous): CL=F,GC=F,NG=F
+Charts → plots/
+Console messages (interpretation):
 
-FX: EURUSD=X
+“In the worst 1% of days, you could lose more than €X in one day.”
 
-Crypto: BTC-USD,ETH-USD
+---
+## 🧾 Supported instruments (Yahoo tickers)
 
-Valuta base (default EUR, codice ISO a 3 lettere).
+Equities / ETFs: AAPL, TLT, EUNL.DE, IWDA.AS, ISP.MI, …
 
-Importi nella valuta base (stesso ordine dei ticker), ad es. 2000,1500,1000,500.
-
-Lo script:
-
-scarica i prezzi (Yahoo Finance, auto-adjusted);
-
-converte tutto nella valuta base via FX di Yahoo;
-
-calcola rendimenti log e VaR 95%/99% per tutti i metodi, su entrambi gli orizzonti;
-
-salva grafici in plots/ e risultati in outputs/.
-
-Output
-
-Tabella comparativa stampata a terminale e salvata in
-outputs/var_comparison_interactive_multiasset.csv
-
-Grafici in plots/, uno per metodo/periodo:
-
-parametric_YYYY_YYYY_interactive.png
-
-historical_YYYY_YYYY_interactive.png
-
-mc_normal_YYYY_YYYY_interactive.png
-
-mc_t_YYYY_YYYY_interactive.png
-
-Messaggi interpretativi (es. “Nel 1% dei casi peggiori potresti perdere più di €X in un giorno”).
-
-Interpretazione del VaR (1-day)
-
-VaR 95% ⇒ nel 5% peggiore dei giorni la perdita è almeno pari al VaR.
-
-VaR 99% ⇒ nell’1% peggiore dei giorni la perdita è almeno pari al VaR.
-
-Differenze tra metodi:
-
-Parametric / MC Normal: assumono normalità (tail più “lisci”).
-
-Historical: quantili direttamente dal campione (sensibile a outlier recenti).
-
-MC t-Student: preserva media/covarianza ma con code più pesanti → VaR 99% spesso più alto.
-
-Asset supportati (ticker Yahoo)
-
-Azioni/ETF: AAPL, TLT, EUNL.DE, IWDA.AS, ISP.MI, …
-
-Futures (continuous): CL=F (WTI), GC=F (oro), SI=F, NG=F, ZC=F (mais), …
+Commodity futures (continuous): CL=F (WTI), GC=F (Gold), SI=F, NG=F, ZC=F, …
 
 FX: EURUSD=X, USDJPY=X, …
 
 Crypto: BTC-USD, ETH-USD, SOL-USD, …
 
-Attenzione ai suffissi di borsa su Yahoo: .MI (Borsa Italiana), .L (LSE), .DE (Xetra), .PA (Parigi), .AS (Amsterdam), ecc.
-
-Configurazioni utili (nel file var_interactive_multiasset.py)
-CALENDAR_FREQ = "B"   # "B" = Business Days (consigliato), "D" = Calendar Days
-MC_SIMS = 100_000     # n. simulazioni Monte Carlo
-RANDOM_SEED = 42      # riproducibilità
-
-
-Crypto sono 24/7; con CALENDAR_FREQ="B" tutto viene allineato a giorni lavorativi (le crypto sono downsampled con ffill).
-
-Se preferisci includere i weekend, usa CALENDAR_FREQ="D" e documentalo.
-
-Esempio
-Tickers: NVDA,TLT,GLD,BTC-USD
-Valuta base: EUR
-Importi: 2000,1500,1000,500
-
-
-Output (estratto):
-
-[Table] VaR comparison - on EUR 5,000
-                          VaR 95%     VaR 99%
-Parametric (2024-2025)    €xxx.xx     €yyy.yy
-Historical (2024-2025)    €xxx.xx     €yyy.yy
-MC Normal (2024-2025)     €xxx.xx     €yyy.yy
-MC t-Student (2024-2025)  €xxx.xx     €yyy.yy
-...
-
-
-E relativi grafici in plots/.
-
-Troubleshooting
-
-“FX not found …” → controlla la valuta base e il ticker; se l’asset quota già in EUR non serve FX.
-
-Ticker non trovato → verifica il suffisso (.MI, .L, .DE, …).
-
-Buchi di calendario → CALENDAR_FREQ="B" (consigliato) o "D" se vuoi i weekend.
-
-Dati Yahoo: utili per demo/portfolio; per produzione considera fonti professionali e ulteriori controlli.
-
-Roadmap
-
-Backtest rolling (P/L vs VaR, hit ratio)
-
-Expected Shortfall (ES) 97.5% / 99%
-
-Stress test/scenari
-
-Versione CLI non interattiva con argparse
-
-Note & Crediti
-
-Dati: Yahoo Finance (prezzi auto-adjusted).
-
-Il VaR è una stima statistica: non garantisce che la perdita non venga superata.
-
-Autore: Luigi Di Muzio – LinkedIn / Email (inserisci i link).
+⚠️ Use the correct exchange suffix: .MI (Borsa Italiana), .L (LSE), .DE (Xetra), .PA (Paris), .AS (Amsterdam), etc.
 
 ---
+## 🧩 Troubleshooting
 
+“FX not found …”
+Ensure you typed an ISO-3 base currency (e.g., EUR) and a valid ticker; EUR-quoted assets don’t need FX.
+
+Ticker not found / delisted
+Verify spelling and the exchange suffix (.MI, .L, .DE, …).
+
+Weird weekend behavior
+Data are aligned to Business Days. To include weekends, set CALENDAR_FREQ = "D" in the script.
+
+I typed amounts where base currency was requested
+Re-run and enter just the ISO-3 code (e.g., EUR) at that prompt.
+
+---
+## 📝 Notes & Disclaimer
+
+Data source: Yahoo Finance, auto-adjusted prices (splits/dividends).
+
+VaR is a statistical estimate; extreme losses can exceed VaR. Educational use only.
+
+Crypto are 24/7; downsampled to business days by default for comparability.
+
+---
 ## 📫 Contact
 - LinkedIn: [Luigi Di Muzio](https://linkedin.com/in/luigidimuzio)  
 - Email: [luigidimu@gmail.com](mailto:luigidimu@gmail.com)
