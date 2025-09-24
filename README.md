@@ -24,25 +24,77 @@ All series are converted to a base currency you choose (default EUR), then four 
 ---
 ## 🛠️ How it was built (step-by-step)
 
-Input (CLI, interactive).
-1. Ask user for: tickers, base currency (ISO-3), amounts in base currency.
-2. Download prices.
-   1. yfinance.download(..., auto_adjust=True) to get close prices (dividends/splits adjusted).
-   2. Detect quote currency.
-   3. For each ticker, read fast_info["currency"].
-   4. FX conversion to base.
-   5. If quote currency ≠ base, download the FX pair (BASEQUOTE=X) and convert price: -> price_in_base = price_in_quote / FX(BASE/QUOTE).
-3. Calendar alignment.
-4. Reindex to Business Days (“B”) and forward-fill gaps (crypto are 24/7, others aren’t).
-5. Portfolio returns.
-6. Log-returns per asset → weight by user amounts → single portfolio return series.
-7. VaR engines.
-   1. Parametric: VaRα = −(μ + zα·σ)·Capital
-   2. Historical: empirical α-quantile of returns (left tail)
-   3. MC Normal: draw from N(μ, Σ) preserving historical covariance
-   4. MC t-Student: scale-mixture t_df(μ, Σ); df estimated from portfolio excess kurtosis
-8. Outputs.
-Save VaR table (CSV), render 8 charts (method × horizon), print human-readable messages.
+**Input (CLI, interactive).**  
+Ask for: tickers, base currency (ISO-3), amounts in base currency.
+
+1. **Download prices**  
+   `yfinance.download(..., auto_adjust=True)` → adjusted close.  
+   Detect quote currency via `fast_info["currency"]`.  
+   If quote ≠ base → download FX pair `BASEQUOTE=X` and convert:
+
+$$
+P^{\text{base}}_t = \frac{P^{\text{quote}}_t}{\text{FX}^{\text{BASE/QUOTE}}_t}
+$$
+
+2. **Calendar alignment**  
+Reindex to **Business Days** (“B”) and forward-fill gaps (crypto 24/7, others don’t).
+
+3. **Portfolio returns**  
+Compute log-returns per asset $r_t=\ln(P_t/P_{t-1})$; aggregate with weights $w$:
+
+$$
+r^{(p)}_t = \mathbf{w}^\top \mathbf{r}_t
+$$
+
+Total capital $V$ = sum of user amounts.
+
+4. **VaR engines (confidence $\alpha\in\{0.95,0.99\}$)**
+
+**a) Parametric (Normal)**  
+Estimate $\mu_p,\sigma_p$; left-tail quantile $q_{1-\alpha}=\mu_p+\sigma_p\\Phi^{-1}(1-\alpha)$.  
+**VaR (currency):**
+
+$$
+\mathrm{VaR}_\alpha = -q_{1-\alpha}V
+= -\big(\mu_p+\sigma_p\\Phi^{-1}(1-\alpha)\big)V
+$$
+
+**b) Historical Simulation**  
+Empirical left-tail quantile of portfolio returns:
+
+$$
+\mathrm{VaR}_\alpha = -Q_{1-\alpha}\!\big(r^{(p)}\big)V
+$$
+
+**c) Monte Carlo — Normal multivariate**  
+Estimate $\boldsymbol\mu$, $\boldsymbol\Sigma$. Simulate
+$\mathbf{r}=\boldsymbol\mu+L\mathbf{z}$ with $L$ Cholesky of $\boldsymbol\Sigma$ and
+$\mathbf{z}\sim\mathcal{N}(\mathbf{0},I)$; take $Q_{1-\alpha}$ of $r^{(p)}=\mathbf{w}^\top\mathbf{r}$:
+
+$$
+\mathrm{VaR}_\alpha = -Q_{1-\alpha}\!\big(r^{(p)}\big)V
+$$
+
+**d) Monte Carlo — t-Student multivariate (fat tails)**  
+Same $\boldsymbol\mu,\boldsymbol\Sigma$. Degrees of freedom $\nu$ from excess kurtosis $g_2$
+(e.g., $\nu \approx 4 + \frac{6}{g_2}$, con clipping). Draw $\mathbf{z}\sim\mathcal{N}(\mathbf{0},I)$, $s\sim\chi^2_{\nu}/\nu$, then
+
+
+$$
+\mathbf{r} = \boldsymbol\mu + \frac{L\mathbf{z}}{\sqrt{s}}
+$$
+
+Aggregate and take $Q_{1-\alpha}$ as above:
+
+$$
+\mathrm{VaR}_\alpha = -Q_{1-\alpha}\!\big(r^{(p)}\big)V
+$$
+
+5. **Outputs**  
+CSV table (VaR by method & horizon), 8 charts (method × horizon), and plain-language messages.
+
+
+
 ---
 ## 📚 Libraries used (and why)
 
