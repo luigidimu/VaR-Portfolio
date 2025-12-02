@@ -2,6 +2,7 @@
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Finance](https://img.shields.io/badge/Finance-Quantitative-green)
+![Parametric VaR example](plots/parametric_2024_2025_interactive.png)
 
 ## 💡 Motivazione del Progetto
 Ho sviluppato questo progetto per un'esigenza pratica personale: **analizzare il rischio reale del mio portafoglio investimenti.**
