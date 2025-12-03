@@ -1,7 +1,6 @@
 import warnings
 warnings.filterwarnings("ignore")  # silenzia messaggi runtime non critici
 
-# Per evitare tipizzazioni troppo "rigide" che fanno rumore con Pylance
 import os
 import datetime as dt
 
@@ -66,7 +65,7 @@ def ask_base_ccy(prompt: str, default: str = "EUR") -> str:
 def _fx_symbol(from_ccy: str, to_ccy: str) -> str:
     """
     Yahoo usa BASEQUOTE=X.
-    Per convertire prezzi da FROM -> TO, ci serve TOFROM=X e poi fare PREZZO / FX.
+    Per convertire prezzi da FROM -> TO, serve TOFROM=X e poi fare PREZZO / FX.
     Esempio: da USD a EUR -> simbolo 'EURUSD=X' (1 EUR = X USD), quindi prezzo_EUR = prezzo_USD / FX.
     """
     return f"{to_ccy}{from_ccy}=X"
@@ -112,7 +111,7 @@ def fetch_close_in_base(ticker: str, start, end, base_ccy: str) -> pd.Series:
     if not isinstance(df, pd.DataFrame):
         raise RuntimeError(f"Download fallito per {ticker}")
 
-    # estrae 'Close' in modo robusto
+    # estrae i 'Close' 
     if "Close" in df.columns:
         px = df["Close"]
         if isinstance(px, pd.DataFrame):
@@ -381,3 +380,4 @@ if __name__ == "__main__":
     plot_with_lines(port_long, total_capital, f"Portfolio distribution - 2015-{end_date.year} - Monte Carlo t-Student", mcT_long, "-.", f"plots/mc_t_2015_{end_date.year}_interactive.png")
 
     print("\nFatto. Grafici in ./plots e risultati in ./outputs.")
+
