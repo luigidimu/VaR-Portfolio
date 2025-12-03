@@ -43,6 +43,7 @@ def ask_floats(prompt: str, n: int) -> np.ndarray:
     vals = [v.strip() for v in s.split(",") if v.strip()]
     if len(vals) != n:
         raise ValueError(f"Servono {n} valori, ne hai dati {len(vals)}.")
+    # [numpy] Crea un array numpy di float partendo dalla lista di stringhe, sostituendo la virgola col punto per i decimali
     arr = np.array([float(x.replace(",", ".")) for x in vals], dtype=float)
     if np.any(arr <= 0):
         raise ValueError("Tutti gli importi devono essere > 0.")
@@ -74,10 +75,12 @@ def fetch_fx_series(from_ccy: str, to_ccy: str, start, end) -> pd.Series:
     """Scarica la serie FX (TO/FROM). Se mancante, prova l'inversa e inverte."""
     if from_ccy == to_ccy:
         # Serie costante = 1, indicizzata sul calendario richiesto
+        # [pandas] Crea un indice di date con frequenza specificata (Business o Calendar)
         idx = pd.date_range(start=start, end=end, freq=CALENDAR_FREQ)
         return pd.Series(1.0, index=idx, name=f"{to_ccy}/{from_ccy}")
 
     sym = _fx_symbol(from_ccy, to_ccy)
+    # [yfinance] Scarica i dati storici dal web per il simbolo specificato
     df = yf.download(sym, start=start, end=end, auto_adjust=True)
     s = df["Close"] if isinstance(df, pd.DataFrame) else df
     if isinstance(s, pd.DataFrame):
@@ -97,7 +100,9 @@ def fetch_fx_series(from_ccy: str, to_ccy: str, start, end) -> pd.Series:
         s = 1.0 / si
 
     # riallinea al calendario globale (ffill per buche)
+    # [pandas] Crea un range di date completo per coprire tutto il periodo
     idx = pd.date_range(s.index.min(), s.index.max(), freq=CALENDAR_FREQ)
+    # [pandas] Reindicizza la serie sul nuovo indice e riempie i valori mancanti con l'ultimo valore valido (forward fill)
     s = s.reindex(idx).ffill()
     s.name = f"{to_ccy}/{from_ccy}"
     return s
@@ -143,9 +148,11 @@ def fetch_close_in_base(ticker: str, start, end, base_ccy: str) -> pd.Series:
 
     # conversione in valuta base
     fx = fetch_fx_series(from_ccy=ccy, to_ccy=base_ccy, start=px.index.min(), end=px.index.max())
+    # [pandas] Concatena le due serie (prezzo e cambio) lungo le colonne (axis=1) allineando gli indici
     df_conv = pd.concat([px, fx], axis=1).dropna()
     if df_conv.empty:
         raise RuntimeError(f"Impossibile allineare {ticker} con FX {ccy}->{base_ccy}")
+    # [pandas] Divide la colonna dei prezzi per il tasso di cambio per convertire nella valuta base
     px_base = df_conv.iloc[:, 0] / df_conv.iloc[:, 1]
     px_base.name = ticker
     return px_base
@@ -164,6 +171,7 @@ def get_close_df_any_asset(tickers: list, start, end, base_ccy: str) -> pd.DataF
             print(f"[WARN] {t}: {e}")
     if not cols:
         raise RuntimeError("Nessuna serie valida scaricata.")
+    # [pandas] Unisce tutte le serie scaricate in un unico DataFrame
     df = pd.concat(cols, axis=1).astype(float)
     # eventuali colonne completamente vuote (dopo allineamento) vengono rimosse
     df = df.dropna(axis=1, how="all")
@@ -181,17 +189,20 @@ def portfolio_returns(price_data, weights: np.ndarray) -> pd.Series:
     - Ribilancia equal-weight se manca qualche colonna
     """
     price_df = pd.DataFrame(price_data).astype(float)
+    # [numpy/pandas] Calcola i rendimenti logaritmici: ln(prezzo_t / prezzo_t-1)
     rets = np.log(price_df / price_df.shift(1)).dropna() # type: ignore
     if rets.shape[1] != len(weights):
         w = np.repeat(1.0 / rets.shape[1], rets.shape[1])
     else:
         w = weights
+    # [pandas] Prodotto scalare (dot product) tra matrice rendimenti e vettore pesi per ottenere rendimento portafoglio
     return rets.dot(w)  # Series
 
 def var_parametric_from_series(port_ret: pd.Series, total_capital: float, alphas=(0.95, 0.99)) -> dict:
     mu, sigma = float(port_ret.mean()), float(port_ret.std())
     out = {}
     for a in alphas:
+        # [scipy.stats] Calcola l'inverso della funzione di ripartizione normale (percent point function) per trovare lo z-score
         z = float(norm.ppf(1 - a))
         out[f"VaR {int(a*100)}%"] = float(-(mu + z * sigma) * total_capital)
     return out
@@ -199,6 +210,7 @@ def var_parametric_from_series(port_ret: pd.Series, total_capital: float, alphas
 def var_historical_from_series(port_ret: pd.Series, total_capital: float, alphas=(0.95, 0.99)) -> dict:
     out = {}
     for a in alphas:
+        # [numpy] Calcola il percentile empirico dalla distribuzione storica dei rendimenti
         q = float(np.percentile(port_ret, (1 - a) * 100))  # quantile coda sinistra
         out[f"VaR {int(a*100)}%"] = float(-q * total_capital)
     return out
@@ -209,10 +221,13 @@ def mc_normal_var_from_prices(price_data, weights, total_capital, n_sims=MC_SIMS
         np.random.seed(random_seed)
     df = pd.DataFrame(price_data).astype(float)
     rets = np.log(df / df.shift(1)).dropna() # type: ignore
+    # [numpy] Calcola vettori medie e matrice di covarianza dei rendimenti
     mu_vec = rets.mean().to_numpy()
     cov_mat = rets.cov().to_numpy()
+    # [numpy] Genera scenari casuali da una distribuzione normale multivariata
     sims = np.random.multivariate_normal(mean=mu_vec, cov=cov_mat, size=n_sims)
     w = weights if rets.shape[1] == len(weights) else np.repeat(1 / rets.shape[1], rets.shape[1])
+    # [numpy] Calcola i rendimenti simulati del portafoglio (prodotto matriciale scenari x pesi)
     port_sims = sims @ w
     out = {}
     for a in alphas:
@@ -225,11 +240,13 @@ def estimate_df_from_excess_kurtosis(x, min_df=4.5, max_df=30.0, default_df=8.0)
     s = pd.Series(x, dtype="float64").dropna()
     if s.empty:
         return float(default_df)
+    # [pandas] Calcola la curtosi (code grasse) della serie
     g2 = float(s.kurtosis()) # type: ignore
     if not np.isfinite(g2):
         return float(default_df)
     g2 = max(g2, 0.3)  # evita esplosioni
     df = 4.0 + 6.0 / g2
+    # [numpy] Limita i gradi di libertà tra un minimo e un massimo per evitare valori estremi
     return float(np.clip(df, min_df, max_df))
 
 def mc_t_var_from_prices(price_data, weights, total_capital, n_sims=MC_SIMS, alphas=(0.95, 0.99), df=None, random_seed=RANDOM_SEED) -> dict:
@@ -249,9 +266,12 @@ def mc_t_var_from_prices(price_data, weights, total_capital, n_sims=MC_SIMS, alp
     df = float(max(df, 2.1))
 
     # Z ~ N(0, S) tramite Cholesky
+    # [numpy] Decomposizione di Cholesky per generare variabili correlate (L * L.T = S)
     L = np.linalg.cholesky(S + 1e-12 * np.eye(k))
+    # [numpy] Genera normali standard e applica la correlazione
     Z = np.random.randn(n_sims, k) @ L.T
     # fattore t
+    # [numpy] Genera variabili Chi-quadro per simulare la distribuzione t-Student
     W = np.random.chisquare(df, size=n_sims)
     scale = np.sqrt((df - 2.0) / W).reshape(-1, 1)
     T = Z * scale
@@ -283,14 +303,18 @@ def explain_messages(header: str, results: dict) -> None:
 
 def plot_with_lines(port_ret: pd.Series, total_capital: float, title: str, lines: dict, style: str, save_path: str, with_normal=False):
     plt.figure(figsize=(9, 5.6))
+    # [matplotlib] Crea un istogramma dei rendimenti
     plt.hist(port_ret, bins=60, density=True, alpha=0.6)
     if with_normal:
         mu, sigma = float(port_ret.mean()), float(port_ret.std())
         xmin, xmax = plt.xlim()
+        # [numpy] Genera 400 punti equispaziati tra min e max per il plot della curva
         x = np.linspace(xmin, xmax, 400)
+        # [scipy.stats] Calcola la densità di probabilità (PDF) della normale
         p = norm.pdf(x, mu, sigma)
         plt.plot(x, p, linewidth=2, label="Normal fit (mu, sigma)")
     for k, v in lines.items():
+        # [matplotlib] Disegna una linea verticale per indicare il VaR
         plt.axvline(-v / total_capital, linestyle=style, linewidth=2.0, label=f"{k}: €{v:,.0f}")
     plt.title(title)
     plt.xlabel("Daily return"); plt.ylabel("Density"); plt.legend()
